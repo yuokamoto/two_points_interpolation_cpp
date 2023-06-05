@@ -1,0 +1,9 @@
+p0: 50
+pe: -90.0
+v0: -5
+ve: 1
+amax: 1
+vmax: 10
+t0: 0
+dt: 0.001
+verbose: true
