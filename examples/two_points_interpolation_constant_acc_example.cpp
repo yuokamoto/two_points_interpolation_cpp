@@ -5,32 +5,40 @@
 #include <iomanip>
 #include <cmath>
 #include <cstdlib>
+#include <algorithm> 
 
 #include <yaml-cpp/yaml.h>
 
 #include "../two_points_interpolation_constant_acc.hpp"
 
 // Function to generate a Gnuplot script
-void generateGnuplotScript(const std::string& dataFilePath, const std::string& scriptFilePath) {
+void generateGnuplotScript(const std::vector<double>& v1, const std::vector<double>& v2,
+                          const std::vector<double>& v3, 
+                          const std::string& dataFilePath, const std::string& scriptFilePath) {
     std::ofstream scriptFile(scriptFilePath);
     scriptFile << "set terminal png\n";
     scriptFile << "set output 'graph.png'\n";
-    scriptFile << "set multiplot layout 4,1\n";
+    scriptFile << "set grid\n";
+    scriptFile << "set multiplot layout 3,1\n";
+    scriptFile << "set yrange [" << *std::min_element(v1.begin(), v1.end())*1.1 << ":"  << *std::max_element(v1.begin(), v1.end())*1.1 << "]\n";
     scriptFile << "plot '" << dataFilePath << "' using 1:2 with lines title 'acc[m/s^2]'\n";
+    scriptFile << "set yrange [" << *std::min_element(v2.begin(), v2.end())*1.1 << ":"  << *std::max_element(v2.begin(), v2.end())*1.1 << "]\n";
     scriptFile << "plot '" << dataFilePath << "' using 1:3 with lines title 'vel[m/s]'\n";
+    scriptFile << "set yrange [" << *std::min_element(v3.begin(), v3.end())*1.1 << ":"  << *std::max_element(v3.begin(), v3.end())*1.1 << "]\n";
     scriptFile << "plot '" << dataFilePath << "' using 1:4 with lines title 'pos[m]'\n";
     scriptFile << "unset multiplot\n";
     scriptFile.close();
 }
 
 // Function to save vector data to a file
-void saveVectorDataToFile(const std::vector<double>& vector1, const std::vector<double>& vector2,
-                          const std::vector<double>& vector3, const std::string& filePath) {
+void saveVectorDataToFile(const std::vector<double>& v1, const std::vector<double>& v2,
+                          const std::vector<double>& v3, const std::vector<double>& v4, 
+                          const std::string& filePath) {
     std::ofstream outFile(filePath);
     outFile << std::fixed << std::setprecision(6);
 
-    for (std::size_t i = 0; i < vector1.size(); ++i) {
-        outFile << i << " " << vector1[i] << " " << vector2[i] << " " << vector3[i] << "\n";
+    for (std::size_t i = 0; i < v1.size(); ++i) {
+        outFile << v1[i] << " " << v2[i] << " " << v3[i] << " " << v4[i] << "\n";
     }
 
     outFile.close();
@@ -39,7 +47,7 @@ void saveVectorDataToFile(const std::vector<double>& vector1, const std::vector<
 // Function to load constraints from a YAML file
 bool loadConstraintsFromYaml(const std::string& filePath, double& p0, double& pe,
                              double& v0, double& ve, double& amax, double& vmax,
-                             double& t0, double& dt, double& te) {
+                             double& t0, double& dt, bool& verbose) {
     try {
         YAML::Node config = YAML::LoadFile(filePath);
 
@@ -51,7 +59,7 @@ bool loadConstraintsFromYaml(const std::string& filePath, double& p0, double& pe
         vmax = config["vmax"].as<double>();
         t0 = config["t0"].as<double>();
         dt = config["dt"].as<double>();
-        te = config["te"].as<double>();
+        verbose = config["verbose"].as<bool>();
 
         return true;
     } catch (const YAML::Exception& e) {
@@ -74,13 +82,16 @@ int main(int argc, char* argv[]) {
     }
 
     // Load constraints from YAML
-    double p0, pe, v0, ve, amax, vmax, t0, dt, te;
-    if (!loadConstraintsFromYaml(filename, p0, pe, v0, ve, amax, vmax, t0, dt, te)) {
+    double p0, pe, v0, ve, amax, vmax, t0, dt;
+    bool verbose;
+    if (!loadConstraintsFromYaml(filename, p0, pe, v0, ve, amax, vmax, t0, dt, verbose)) {
         return 1;
     }
 
     // Generate trajectory
-
+    TwoPointInterpolation tpi(verbose);
+    tpi.init(p0, pe, amax, vmax, t0, v0, ve);
+    const double te = tpi.calcTrajectory();
 
     // Simulation condition
     std::vector<double> tref;
@@ -88,29 +99,22 @@ int main(int argc, char* argv[]) {
     std::vector<double> vel;
     std::vector<double> acc;
 
-    for (double t = t0; t < t0 + te; t += dt) {
-        std::cout << t << std::endl;
-        tref.push_back(t);
-        pos.push_back(0.0);
-        vel.push_back(0.0);
-        acc.push_back(0.0);
-    }
-
     // Calculate pos, vel, and acc
-    for (std::size_t i = 0; i < 3; ++i) {
-        for (std::size_t j = 0; j < tref.size(); ++j) {
-            // todo update
-            // pos[j][i], vel[j][i], acc[j][i] = interp.get_point(tref[j]);
-        }
+    for (double t = t0; t < t0 + te; t += dt) {
+        std::vector<double> res = tpi.getPoint(t);
+        tref.push_back(t);
+        pos.push_back(res[0]);
+        vel.push_back(res[1]);
+        acc.push_back(res[2]);
     }
 
     // Save data to a file
     std::string dataFilePath = "data.txt";
-    saveVectorDataToFile(acc, vel, pos, dataFilePath);
+    saveVectorDataToFile(tref, acc, vel, pos, dataFilePath);
 
     // Generate Gnuplot script
     std::string scriptFilePath = "script.gnu";
-    generateGnuplotScript(dataFilePath, scriptFilePath);
+    generateGnuplotScript(acc, vel, pos, dataFilePath, scriptFilePath);
 
     // Execute Gnuplot script
     std::string command = "gnuplot " + scriptFilePath;

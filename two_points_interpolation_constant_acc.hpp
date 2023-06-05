@@ -67,30 +67,27 @@ public:
     }
 
     double calcTrajectory() {
-        double vmax = _vmax;
-        double v0 = _v0;
-        double p0 = _p0;
-        double t0 = _t0;
-        double ve = _ve;
-        double pe = _pe;
-        double dp = pe - p0;
-        double dv = ve - v0;
+        double dp = _pe - _p0;
+        double dv = _ve - _v0;
 
         _dt.clear();
         _a.clear();
         _v.clear();
         _p.clear();
 
+        _v.push_back(_v0);
+        _p.push_back(_p0);
+
         _aSigned = _amax * dp / std::fabs(dp);
-        double b = 2 * v0 / _aSigned;
-        double c = (-dv * (ve + v0) * 0.5 - dp) / _aSigned;
+        double b = 2 * _v0 / _aSigned;
+        double c = (-dv * (_ve + _v0) * 0.5 - dp) / _aSigned;
         if (b * b - 4 * c > 0) { // not reach the vmax
             double dt01 = 0.5 * (-b + std::sqrt(b * b - 4 * c));
-            double v1 = vInteg(v0, _aSigned, dt01);
+            double v1 = vInteg(_v0, _aSigned, dt01);
 
-            if (std::fabs(v1) < vmax) {
+            if (std::fabs(v1) < _vmax) {
                 _caseNum = 0;
-                double p1 = pInteg(p0, v0, _aSigned, dt01);
+                double p1 = pInteg(_p0, _v0, _aSigned, dt01);
                 double dt1e = dt01 - dv / _aSigned;
                 _dt.push_back(dt01);
                 _dt.push_back(dt1e);
@@ -100,18 +97,18 @@ public:
                 _p.push_back(p1);
             } else {
                 _caseNum = 1;
-                double v1 = vmax * dp / std::fabs(dp);
-                double dt01 = std::fabs((v1 - v0) / _aSigned);
-                double p1 = pInteg(p0, v0, _aSigned, dt01);
+                double v1 = _vmax * dp / std::fabs(dp);
+                double dt01 = std::fabs((v1 - _v0) / _aSigned);
+                double p1 = pInteg(_p0, _v0, _aSigned, dt01);
                 _dt.push_back(dt01);
                 _a.push_back(_aSigned);
                 _v.push_back(v1);
                 _p.push_back(p1);
                 double v2 = v1;
-                double dt2e = -(ve - v2) / _aSigned;
+                double dt2e = -(_ve - v2) / _aSigned;
                 double dp2e = pInteg(0, v2, -_aSigned, dt2e);
-                double dt12 = (pe - p1 - dp2e) / v1;
-                double p2 = pe - dp2e;
+                double dt12 = (_pe - p1 - dp2e) / v1;
+                double p2 = _pe - dp2e;
                 _dt.push_back(dt12);
                 _dt.push_back(dt2e);
                 _a.push_back(0.0);
