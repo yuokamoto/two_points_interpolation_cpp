@@ -100,8 +100,8 @@ public:
                 _p.push_back(p1);
             } else {
                 _caseNum = 1;
-                double v1 = _vmax * dp / std::fabs(dp);
-                double dt01 = std::fabs((v1 - _v0) / _aSigned);
+                v1 = _vmax * dp / std::fabs(dp);
+                dt01 = std::fabs((v1 - _v0) / _aSigned);
                 double p1 = pInteg(_p0, _v0, _aSigned, dt01);
                 _dt.push_back(dt01);
                 _a.push_back(_aSigned);
