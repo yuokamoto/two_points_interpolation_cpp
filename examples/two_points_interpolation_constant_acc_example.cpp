@@ -90,8 +90,7 @@ int main(int argc, char* argv[]) {
 
     // Generate trajectory
     TwoPointInterpolation tpi(verbose);
-    tpi.init(p0, pe, amax, vmax, t0, v0, ve);
-    const double te = tpi.calcTrajectory();
+    const double te = tpi.calcTrajectory(p0, pe, amax, vmax, t0, v0, ve);
 
     // Simulation condition
     std::vector<double> tref;

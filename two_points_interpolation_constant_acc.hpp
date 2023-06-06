@@ -2,11 +2,11 @@
 #include <cmath>
 #include <vector>
 
-double vInteg(double v0, double a, double dt) {
+inline double vInteg(const double v0, const double a, const double dt) {
     return v0 + a * dt;
 }
 
-double pInteg(double p0, double v0, double a, double dt) {
+inline double pInteg(const double p0, const double v0, const double a, const double dt) {
     return p0 + v0 * dt + 0.5 * a * dt * dt;
 }
 
@@ -33,7 +33,7 @@ private:
     int _caseNum;
 
 public:
-    TwoPointInterpolation(bool verbose = false) {
+    TwoPointInterpolation(const bool verbose = false) {
         _pointSetted = false;
         _constraintsSetted = false;
         _initialStateSetted = false;
@@ -41,26 +41,29 @@ public:
         _verbose = verbose;
     }
 
-    void setInitial(double t0, double p0, double v0 = 0) {
+    void setInitial(const double t0, const double p0, const double v0 = 0) {
         _t0 = t0;
         _p0 = p0;
         _v0 = v0;
         _initialStateSetted = true;
     }
 
-    void setPoint(double pe, double ve = 0) {
+    void setPoint(const double pe, const double ve = 0) {
         _pe = pe;
         _ve = ve;
         _pointSetted = true;
     }
 
-    void setConstraints(double amax, double vmax) {
+    void setConstraints(const double amax, const double vmax) {
         _amax = amax;
         _vmax = vmax;
         _constraintsSetted = true;
     }
 
-    void init(double p0, double pe, double amax, double vmax, double t0 = 0, double v0 = 0, double ve = 0) {
+    void init(const double p0, const double pe, 
+              const double amax, const double vmax, 
+              const double t0 = 0, const double v0 = 0, 
+              const double ve = 0) {
         setInitial(t0, p0, v0);
         setPoint(pe, ve);
         setConstraints(amax, vmax);
@@ -155,7 +158,15 @@ public:
         return totalDt;
     }
 
-    std::vector<double> getPoint(double t) {
+    double calcTrajectory(const double p0, const double pe, 
+                          const double amax, const double vmax, 
+                          const double t0 = 0, const double v0 = 0, 
+                          const double ve = 0) {
+        init(p0, pe, amax, vmax, t0, v0, ve);
+        return calcTrajectory();
+    }
+
+    std::vector<double> getPoint(const double t) const {
         double a = 0;
         double v = 0;
         double pos = 0;
@@ -196,7 +207,7 @@ public:
     }
 
 private:
-    double sum(const std::vector<double>& values, int count) {
+    double sum(const std::vector<double>& values, const int count) const {
         double total = 0.0;
         for (int i = 0; i < count && i < values.size(); ++i) {
             total += values[i];
