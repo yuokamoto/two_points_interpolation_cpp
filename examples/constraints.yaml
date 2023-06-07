@@ -1,9 +1,10 @@
-p0: 50
-pe: -90.0
-v0: -5
-ve: 1
+p0: 4.7
+pe: 1.57
+v0: 0
+ve: 0.5
 amax: 1
-vmax: 10
+vmax: 3.14
 t0: 0
 dt: 0.001
 verbose: true
+normalize_angle: true

@@ -10,6 +10,15 @@ inline double pInteg(const double p0, const double v0, const double a, const dou
     return p0 + v0 * dt + 0.5 * a * dt * dt;
 }
 
+inline double normalizeAxis(const double input){
+    double output = fmod(input + M_PI, 2 * M_PI);
+    if (output < 0)
+    {
+        output += 2 * M_PI;
+    }
+    return output - M_PI;
+}
+
 class TwoPointInterpolation {
 private:
     bool _pointSetted;
@@ -213,5 +222,43 @@ private:
             total += values[i];
         }
         return total;
+    }
+};
+
+class TwoAngleInterpolation : public TwoPointInterpolation {
+private:
+    bool _normalize_output = true;
+public:
+    TwoAngleInterpolation(const bool verbose = false) : TwoPointInterpolation(verbose) {}
+
+    void init(const double p0, const double pe, 
+              const double amax, const double vmax, 
+              const double t0 = 0, const double v0 = 0, 
+              const double ve = 0) {
+        
+        const double p0n = normalizeAxis(p0);
+        const double pen = normalizeAxis(pe);
+        const double dp = normalizeAxis(pen - p0n);
+
+        setInitial(t0, p0n, v0);
+        setPoint(p0n+dp, ve);
+        setConstraints(amax, vmax);
+    }
+
+    double calcTrajectory(const double p0, const double pe, 
+                          const double amax, const double vmax, 
+                          const double t0 = 0, const double v0 = 0, 
+                          const double ve = 0) {
+        init(p0, pe, amax, vmax, t0, v0, ve);
+        return TwoPointInterpolation::calcTrajectory();
+    }
+
+    std::vector<double> getPoint(const double t, const bool normalize = true) const {
+        std::vector<double> result = TwoPointInterpolation::getPoint(t);
+        if (normalize)
+        {
+            result[0] = normalizeAxis(result[0]);
+        }
+        return result;
     }
 };

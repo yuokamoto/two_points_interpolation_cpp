@@ -47,7 +47,7 @@ void saveVectorDataToFile(const std::vector<double>& v1, const std::vector<doubl
 // Function to load constraints from a YAML file
 bool loadConstraintsFromYaml(const std::string& filePath, double& p0, double& pe,
                              double& v0, double& ve, double& amax, double& vmax,
-                             double& t0, double& dt, bool& verbose) {
+                             double& t0, double& dt, bool& verbose, bool& normalize_angle) {
     try {
         YAML::Node config = YAML::LoadFile(filePath);
 
@@ -60,6 +60,7 @@ bool loadConstraintsFromYaml(const std::string& filePath, double& p0, double& pe
         t0 = config["t0"].as<double>();
         dt = config["dt"].as<double>();
         verbose = config["verbose"].as<bool>();
+        normalize_angle = config["normalize_angle"].as<bool>();
 
         return true;
     } catch (const YAML::Exception& e) {
@@ -83,13 +84,13 @@ int main(int argc, char* argv[]) {
 
     // Load constraints from YAML
     double p0, pe, v0, ve, amax, vmax, t0, dt;
-    bool verbose;
-    if (!loadConstraintsFromYaml(filename, p0, pe, v0, ve, amax, vmax, t0, dt, verbose)) {
+    bool verbose, normalize_angle;
+    if (!loadConstraintsFromYaml(filename, p0, pe, v0, ve, amax, vmax, t0, dt, verbose, normalize_angle)) {
         return 1;
     }
 
     // Generate trajectory
-    TwoPointInterpolation tpi(verbose);
+    TwoAngleInterpolation tpi(verbose);
     const double te = tpi.calcTrajectory(p0, pe, amax, vmax, t0, v0, ve);
 
     // Simulation condition
@@ -100,7 +101,7 @@ int main(int argc, char* argv[]) {
 
     // Calculate pos, vel, and acc
     for (double t = t0; t < t0 + te; t += dt) {
-        std::vector<double> res = tpi.getPoint(t);
+        std::vector<double> res = tpi.getPoint(t, normalize_angle);
         tref.push_back(t);
         pos.push_back(res[0]);
         vel.push_back(res[1]);
