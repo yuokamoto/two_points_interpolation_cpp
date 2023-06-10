@@ -69,6 +69,11 @@ public:
         _constraintsSetted = true;
     }
 
+    bool isInitialized()
+    {
+        return _pointSetted && _constraintsSetted && _initialStateSetted && _trajectoryCalced;
+    }
+
     void init(const double p0, const double pe, 
               const double amax, const double vmax, 
               const double t0 = 0, const double v0 = 0, 
@@ -90,14 +95,13 @@ public:
         _v.push_back(_v0);
         _p.push_back(_p0);
 
-        _aSigned = _amax * dp / std::fabs(dp);
-        double b = 2 * _v0 / _aSigned;
-        double c = (-dv * (_ve + _v0) * 0.5 - dp) / _aSigned;
-        if (b * b - 4 * c > 0) { // not reach the vmax
-            double dt01 = 0.5 * (-b + std::sqrt(b * b - 4 * c));
+        _aSigned = _amax * dp / std::fabs(dp); 
+        double b = _v0 / _aSigned;
+        double c = (-dv * (_ve + _v0) * 0.5 / _aSigned - dp) / _aSigned;
+        if (b * b - c > 0) { 
+            double dt01 = -b + std::sqrt(b * b - c);
             double v1 = vInteg(_v0, _aSigned, dt01);
-
-            if (std::fabs(v1) < _vmax) {
+            if (std::fabs(v1) < _vmax) { // not reach the vmax
                 _caseNum = 0;
                 double p1 = pInteg(_p0, _v0, _aSigned, dt01);
                 double dt1e = dt01 - dv / _aSigned;
@@ -110,14 +114,14 @@ public:
             } else {
                 _caseNum = 1;
                 v1 = _vmax * dp / std::fabs(dp);
-                dt01 = std::fabs((v1 - _v0) / _aSigned);
+                dt01 = (v1 - _v0) / _aSigned;
                 double p1 = pInteg(_p0, _v0, _aSigned, dt01);
                 _dt.push_back(dt01);
                 _a.push_back(_aSigned);
                 _v.push_back(v1);
                 _p.push_back(p1);
                 double v2 = v1;
-                double dt2e = -(_ve - v2) / _aSigned;
+                double dt2e = (_ve - v2) / -_aSigned;
                 double dp2e = pInteg(0, v2, -_aSigned, dt2e);
                 double dt12 = (_pe - p1 - dp2e) / v1;
                 double p2 = _pe - dp2e;
