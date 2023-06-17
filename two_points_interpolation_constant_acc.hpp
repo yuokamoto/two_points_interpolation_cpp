@@ -133,7 +133,9 @@ public:
                 _p.push_back(p2);
             }
         } else {
-            std::cout << "error" << std::endl;
+            if (_verbose) {
+                std::cout << "TwoPointInterpolation::calcTrajectory error" << std::endl;
+            }
             return -1;
         }
 
