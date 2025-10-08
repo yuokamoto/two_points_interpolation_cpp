@@ -1,0 +1,10 @@
+ps: 0.0
+pe: 10.0
+v0: 0
+ve: 0
+amax: 2.0
+vmax: 3.0
+jmax: 1.0
+t0: 0.0
+dt: 0.01
+verbose: true

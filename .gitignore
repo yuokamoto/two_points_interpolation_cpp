@@ -1,4 +1,41 @@
+# Build directories
 examples/build/*
+build/
+
+# Example output files - acceleration
 script.gnu
 graph.png
 data.txt
+
+# Example output files - jerk  
+plot_jerk.gnu
+graph_jerk.png
+data_jerk.txt
+
+# Compiled executables
+examples/jerk_example
+examples/acc_example
+test_interpolation
+
+# General C++ build artifacts
+*.o
+*.obj
+*.exe
+*.out
+*.so
+*.dll
+*.dylib
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+
+# IDE and editor files
+.vscode/
+.vs/
+*.swp
+*.swo
+*~

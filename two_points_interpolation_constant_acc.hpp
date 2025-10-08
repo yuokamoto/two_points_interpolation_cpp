@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cmath>
 #include <vector>
+#include <stdexcept>
 
 inline double vInteg(const double v0, const double a, const double dt) {
     return v0 + a * dt;
@@ -64,6 +65,12 @@ public:
     }
 
     void setConstraints(const double amax, const double vmax) {
+        if (amax <= 0) {
+            throw std::invalid_argument("amax must be positive");
+        }
+        if (vmax <= 0) {
+            throw std::invalid_argument("vmax must be positive");
+        }
         _amax = amax;
         _vmax = vmax;
         _constraintsSetted = true;
@@ -84,8 +91,36 @@ public:
     }
 
     double calcTrajectory() {
+        if (!_pointSetted) {
+            throw std::runtime_error("End point not set. Call setPoint() first.");
+        }
+        if (!_constraintsSetted) {
+            throw std::runtime_error("Constraints not set. Call setConstraints() first.");
+        }
+        if (!_initialStateSetted) {
+            throw std::runtime_error("Initial state not set. Call setInitial() first.");
+        }
+
         double dp = _pe - _p0;
         double dv = _ve - _v0;
+
+        // Check if start and end positions are the same
+        if (dp == 0) {
+            if (dv == 0) {
+                // No movement needed, trajectory is already complete
+                _dt.clear();
+                _a.clear();
+                _v.clear();
+                _p.clear();
+                _v.push_back(_v0);
+                _p.push_back(_p0);
+                _caseNum = -1;  // Special case for no movement
+                _trajectoryCalced = true;
+                return 0.0;
+            } else {
+                throw std::invalid_argument("Cannot have different velocities at the same position (dp=0, but dv!=0)");
+            }
+        }
 
         _dt.clear();
         _a.clear();
@@ -185,6 +220,15 @@ public:
         double a = 0;
         double v = 0;
         double pos = 0;
+
+        // Handle special case where no movement is needed (dp=0, dv=0)
+        if (_caseNum == -1) {
+            a = 0.0;
+            v = _v0;
+            pos = _p0;
+            std::vector<double> result = {pos, v, a};
+            return result;
+        }
 
         double tau = t - _t0;
 
