@@ -1,0 +1,12 @@
+# Case 1: vmax reached (matches Python example)
+p0: 0.0
+pe: 50.0
+v0: 2.0
+ve: 1.0
+amax: 2.0
+dec_max: 4.0
+vmax: 8.0
+t0: 0.0
+dt: 0.01
+verbose: true
+normalize_angle: false

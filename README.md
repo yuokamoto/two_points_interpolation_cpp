@@ -109,26 +109,36 @@ sudo apt install libyaml-cpp-dev gnuplot
 ```bash
 cd examples
 
-# Run constant acceleration example
-./build_and_run.sh acc
+# Run examples with Python-matching parameters (recommended)
+./build_and_run.sh acc constraints_case0.yaml  # Case 0: vmax not reached
+./build_and_run.sh acc constraints_case1.yaml  # Case 1: vmax reached
 
 # Run constant jerk example
-./build_and_run.sh jerk
+./build_and_run.sh jerk constraints_jerk.yaml
 ```
 
-Configuration files: `constraints.yaml`, `constraints_jerk.yaml`
+The examples generate:
+- `data.txt` - Trajectory data points
+- `script.gnu` - Gnuplot script
+- `graph.png` - Visualization of position, velocity, and acceleration
 
 ### Example Results
+
+These examples use the same parameters as the Python version for direct comparison.
 
 #### Case 0: vmax not reached
 ![Case 0](examples/images/acc_constant_0.png)
 
-Constraints: p0=10, pe=170, v0=-5, ve=1, acc_max=1, vmax=100, t0=10
+**Parameters**: `t0=1.0, p0=5, pe=15, acc_max=2.0, dec_max=3.0, vmax=10.0, v0=0, ve=0`
+
+Trajectory when the peak velocity is below vmax. Shows two phases: acceleration and deceleration.
 
 #### Case 1: vmax reached  
 ![Case 1](examples/images/acc_constant_1.png)
 
-Constraints: p0=50, pe=-90, v0=-5, ve=1, acc_max=1, vmax=10, t0=0
+**Parameters**: `t0=0, p0=0, pe=50, acc_max=2.0, dec_max=4.0, vmax=8.0, v0=2.0, ve=1.0`
+
+Trajectory when vmax is reached. Shows three phases: acceleration, constant velocity, and deceleration.
 
 ## API Reference
 

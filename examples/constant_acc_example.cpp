@@ -98,8 +98,9 @@ int main(int argc, char* argv[]) {
     }
 
     // Generate trajectory
-    TwoAngleInterpolation tpi(verbose);
-    const double te = tpi.calcTrajectory(p0, pe, amax, vmax, t0, v0, ve, dec_max);
+    TwoPointInterpolation tpi(verbose);
+    tpi.init(p0, pe, amax, vmax, t0, v0, ve, dec_max);
+    const double te = tpi.calcTrajectory();
 
     // Simulation condition
     std::vector<double> tref;
@@ -109,7 +110,7 @@ int main(int argc, char* argv[]) {
 
     // Calculate pos, vel, and acc
     for (double t = t0; t < t0 + te; t += dt) {
-        std::vector<double> res = tpi.getPoint(t, normalize_angle);
+        std::vector<double> res = tpi.getPoint(t);
         tref.push_back(t);
         pos.push_back(res[0]);
         vel.push_back(res[1]);

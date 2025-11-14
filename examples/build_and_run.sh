@@ -1,9 +1,10 @@
 #!/bin/bash
 
-# Usage: ./build_and_run.sh [acc|jerk]
-# Default: acc
+# Usage: ./build_and_run.sh [acc|jerk] [config_file.yaml]
+# Default: acc with default config
 
 TYPE=${1:-acc}
+CONFIG=${2:-}
 
 echo "=== Building Two Points Interpolation Examples ==="
 ./build.sh
@@ -12,7 +13,11 @@ if [ $? -eq 0 ]; then
     echo "✅ Build successful!"
     echo ""
     echo "=== Running $TYPE interpolation example ==="
-    ./run.sh "$TYPE"
+    if [ -n "$CONFIG" ]; then
+        ./run.sh "$TYPE" "$CONFIG"
+    else
+        ./run.sh "$TYPE"
+    fi
     
     if [ $? -eq 0 ]; then
         echo ""
