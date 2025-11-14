@@ -47,6 +47,57 @@ void assertFinalState(const TwoPointInterpolation& tpi, double total_time,
     }
 }
 
+void assertBoundaryContinuity(const TwoPointInterpolation& tpi, double eps = 1e-6) {
+    // Physics-based tolerances
+    double p_tolerance = 1.1 * eps * tpi.getVmax();
+    double v_tolerance = 1.1 * eps * std::max(tpi.getAmaxAccel(), tpi.getAmaxDecel());
+    
+    // Check continuity at each phase boundary
+    double cumulative_time = 0.0;
+    const auto& dt = tpi.getDt();
+    for (size_t i = 0; i < dt.size() - 1; ++i) {  // Loop through all boundaries between phases
+        cumulative_time += dt[i];
+        double t_boundary = cumulative_time;
+        
+        // Get values before, at, and after the boundary
+        auto result_before = tpi.getPoint(t_boundary - eps);
+        auto result_at = tpi.getPoint(t_boundary);
+        auto result_after = tpi.getPoint(t_boundary + eps);
+        
+        double p_before = result_before[0], v_before = result_before[1];
+        double p_at = result_at[0], v_at = result_at[1];
+        double p_after = result_after[0], v_after = result_after[1];
+        
+        // Check position continuity
+        if (std::abs(p_before - p_at) > p_tolerance) {
+            throw std::runtime_error("Position discontinuity before boundary " + std::to_string(i) +
+                                   ": |" + std::to_string(p_before) + " - " + std::to_string(p_at) + 
+                                   "| = " + std::to_string(std::abs(p_before - p_at)) + 
+                                   " > " + std::to_string(p_tolerance));
+        }
+        if (std::abs(p_at - p_after) > p_tolerance) {
+            throw std::runtime_error("Position discontinuity after boundary " + std::to_string(i) +
+                                   ": |" + std::to_string(p_at) + " - " + std::to_string(p_after) + 
+                                   "| = " + std::to_string(std::abs(p_at - p_after)) + 
+                                   " > " + std::to_string(p_tolerance));
+        }
+        
+        // Check velocity continuity
+        if (std::abs(v_before - v_at) > v_tolerance) {
+            throw std::runtime_error("Velocity discontinuity before boundary " + std::to_string(i) +
+                                   ": |" + std::to_string(v_before) + " - " + std::to_string(v_at) + 
+                                   "| = " + std::to_string(std::abs(v_before - v_at)) + 
+                                   " > " + std::to_string(v_tolerance));
+        }
+        if (std::abs(v_at - v_after) > v_tolerance) {
+            throw std::runtime_error("Velocity discontinuity after boundary " + std::to_string(i) +
+                                   ": |" + std::to_string(v_at) + " - " + std::to_string(v_after) + 
+                                   "| = " + std::to_string(std::abs(v_at - v_after)) + 
+                                   " > " + std::to_string(v_tolerance));
+        }
+    }
+}
+
 // Test structure for parameterized tests
 struct TestCase {
     double p0, pe, acc_max, dec_max, vmax, v0, ve;
@@ -172,6 +223,9 @@ void testCase0() {
             // Check final state
             assertFinalState(tpi, total_time, tc.pe, tc.ve);
             
+            // Check boundary continuity at all phase transitions
+            assertBoundaryContinuity(tpi);
+            
             passed++;
         } catch (const std::exception& e) {
             std::cout << "❌ Test failed for: " << tc.description << std::endl;
@@ -222,6 +276,9 @@ void testCase1() {
             
             // Check final state
             assertFinalState(tpi, total_time, tc.pe, tc.ve);
+            
+            // Check boundary continuity at all phase transitions
+            assertBoundaryContinuity(tpi);
             
             passed++;
         } catch (const std::exception& e) {

@@ -341,6 +341,12 @@ public:
         return result;
     }
 
+    // Getters for testing and debugging
+    double getVmax() const { return _vmax; }
+    double getAmaxAccel() const { return _amax_accel; }
+    double getAmaxDecel() const { return _amax_decel; }
+    const std::vector<double>& getDt() const { return _dt; }
+
 private:
     double sum(const std::vector<double>& values, const int count) const {
         double total = 0.0;
