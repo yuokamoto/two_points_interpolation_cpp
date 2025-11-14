@@ -321,7 +321,7 @@ public:
             double v_in = 0.0;
             double p_in = 0.0;
             double t_in = tau;
-            for (int i = 0; i < _dt.size(); i++) {
+            for (size_t i = 0; i < _dt.size(); i++) {
                 double dt_i = sum(_dt, i + 1);
                 if (tau <= dt_i) {
                     t_in = tau - sum(_dt, i);
@@ -348,9 +348,9 @@ public:
     const std::vector<double>& getDt() const { return _dt; }
 
 private:
-    double sum(const std::vector<double>& values, const int count) const {
+    double sum(const std::vector<double>& values, const size_t count) const {
         double total = 0.0;
-        for (int i = 0; i < count && i < values.size(); ++i) {
+        for (size_t i = 0; i < count && i < values.size(); ++i) {
             total += values[i];
         }
         return total;

@@ -234,8 +234,8 @@ public:
 
         double tau = t - _t0;
         double jmax = _jmax;
-        double amax = _amax;
-        double vmax = _vmax;
+        // double amax = _amax;  // Unused
+        // double vmax = _vmax;  // Unused
         double t1 = _t1;
 
         if (_caseNum == 0) {
