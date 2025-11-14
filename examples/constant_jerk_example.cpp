@@ -9,7 +9,7 @@
 
 #include <yaml-cpp/yaml.h>
 
-#include "../two_points_interpolation_constant_jerk.hpp"
+#include "../include/two_point_interpolation/constant_jerk.hpp"
 
 // Function to generate a Gnuplot script for jerk interpolation
 void generateGnuplotScript(const std::vector<double>& v1, const std::vector<double>& v2,

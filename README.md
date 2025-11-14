@@ -5,61 +5,55 @@ C++ implementation of trajectory planning between two points with kinematic cons
 ## Overview
 
 This library provides two trajectory planning algorithms in C++:
-1. **Constant Acceleration**: Generates smooth trajectories with acceleration limits
+1. **Constant Acceleration**: Generates smooth trajectories with acceleration/deceleration limits
 2. **Constant Jerk**: Generates even smoother trajectories with jerk (acceleration derivative) limits
 
-## Features
-
-- ✅ Position, velocity, and acceleration constraints
-- ✅ Time-optimal trajectory generation  
-- ✅ Robust error handling and input validation
+**Key Features:**
+- ✅ Independent acceleration and deceleration limits (`acc_max` != `dec_max`)
+- ✅ Non-zero initial and final velocities
+- ✅ Time-optimal trajectory generation
 - ✅ Header-only implementation for easy integration
-- ✅ Comprehensive test suite
-- ✅ Support for both single-point and two-point initialization APIs
+- ✅ Comprehensive test suite (40+ test scenarios)
+- ✅ Apache 2.0 license
+
+**For detailed mathematical derivations and theory**, see the [Python version documentation](https://github.com/yuokamoto/two_points_interpolation_py).
 
 ## Quick Start
 
 ### Constant Acceleration Example
 
 ```cpp
-#include "two_points_interpolation_constant_acc.hpp"
+#include "two_point_interpolation/constant_acc.hpp"
 
-// Create interpolator
 TwoPointInterpolation interp;
 
-// Set parameters: start_pos, end_pos, max_acc, max_vel, start_time, start_vel, end_vel
-interp.init(0.0, 100.0, 2.0, 10.0, 0.0, 0.0, 0.0);
+// Parameters: p0, pe, acc_max, vmax, t0, v0, ve, dec_max
+interp.init(0.0, 100.0, 2.0, 10.0, 0.0, 0.0, 0.0, 4.0);  // dec_max=4.0 (faster deceleration)
 
-// Calculate trajectory
 double total_time = interp.calcTrajectory();
 
-// Get position, velocity, acceleration at any time t
+// Get position, velocity, acceleration at time t
 auto result = interp.getPoint(5.0);
 double pos = result[0];
 double vel = result[1]; 
 double acc = result[2];
 ```
 
+**Note**: If `dec_max` is not specified (or set to -1), it defaults to `acc_max`.
+
 ### Constant Jerk Example
 
 ```cpp
-#include "two_points_interpolation_constant_jerk.hpp"
+#include "two_point_interpolation/constant_jerk.hpp"
 
-// Create interpolator
 TwoPointInterpolationJerk interp;
 
-// Method 1: New API (compatible with constant_acc)
+// Parameters: p0, pe, amax, vmax, jmax, t0, v0, ve
 interp.init(0.0, 100.0, 2.0, 10.0, 1.0, 0.0, 0.0, 0.0);
 
-// Method 2: Original API
-// std::vector<double> max_values = {vmax, amax, jmax};
-// interp.set(0.0, 100.0, max_values);
-// interp.setInitialTime(0.0);
-
-// Calculate trajectory
 double total_time = interp.calcTrajectory();
 
-// Get position, velocity, acceleration, jerk at any time t
+// Get position, velocity, acceleration, jerk at time t
 auto result = interp.getPoint(5.0);
 double pos = result[0];
 double vel = result[1]; 
@@ -67,96 +61,113 @@ double acc = result[2];
 double jerk = result[3];
 ```
 
-## Files
+## Project Structure
 
-- `two_points_interpolation_constant_acc.hpp`: Constant acceleration trajectory planner (header-only)
-- `two_points_interpolation_constant_jerk.hpp`: Constant jerk trajectory planner (header-only) 
-- `test_interpolation.cpp`: Comprehensive test suite
-- `build_and_test.sh`: Build and run test script
-- `examples/`: Example applications with YAML configuration and plotting
+```
+two_points_interpolation_cpp/
+├── include/
+│   └── two_point_interpolation/
+│       ├── constant_acc.hpp     # Constant acceleration trajectory planner
+│       └── constant_jerk.hpp    # Constant jerk trajectory planner
+├── tests/
+│   └── test_interpolation.cpp   # Comprehensive test suite
+├── examples/
+│   ├── constant_acc_example.cpp
+│   ├── constant_jerk_example.cpp
+│   ├── constraints.yaml
+│   └── ...
+├── docs/
+│   └── CHANGELOG.md
+├── build_and_test.sh
+├── LICENSE
+└── README.md
+```
 
-## Running Tests
+## Building and Testing
 
 ```bash
 # Build and run unit tests
 ./build_and_test.sh
 ```
 
+**Test Coverage:**
+- Basic functionality tests
+- Error handling validation
+- Parameterized tests for Case 0 (vmax not reached) and Case 1 (vmax reached)
+- Non-zero initial/final velocity scenarios
+- Independent acceleration/deceleration tests
+
 ## Examples with Plotting
 
 ### Dependencies
-- yaml-cpp: `sudo apt install libyaml-cpp-dev`
-- gnuplot: `sudo apt-get install gnuplot`
+```bash
+sudo apt install libyaml-cpp-dev gnuplot
+```
 
 ### Running Examples
 
-The examples use a unified build system with argument-based selection:
-
 ```bash
-# Install dependencies
-sudo apt install libyaml-cpp-dev gnuplot
-
-# Navigate to examples directory
 cd examples
 
-# Run constant acceleration example (default)
-./build_and_run.sh
+# Run constant acceleration example
 ./build_and_run.sh acc
 
 # Run constant jerk example
 ./build_and_run.sh jerk
-
-# Run without rebuilding (if already built)
-./run.sh acc
-./run.sh jerk
 ```
 
-### Configuration Files
-- `constraints.yaml`: Configuration for constant acceleration interpolation
-- `constraints_jerk.yaml`: Configuration for constant jerk interpolation
+Configuration files: `constraints.yaml`, `constraints_jerk.yaml`
 
-### Generated Output Files
+### Example Results
 
-**Acceleration Example:**
-- `data.txt`: Trajectory data points
-- `plot.gnu`: gnuplot script  
-- `graph.png`: Visualization plots
+#### Case 0: vmax not reached
+![Case 0](examples/images/acc_constant_0.png)
 
-**Jerk Example:**
-- `data_jerk.txt`: Trajectory data points  
-- `plot_jerk.gnu`: gnuplot script
-- `graph_jerk.png`: Visualization plots (jerk, acceleration, velocity, position)
+Constraints: p0=10, pe=170, v0=-5, ve=1, acc_max=1, vmax=100, t0=10
 
-### Example Features
-- YAML-based parameter configuration
-- Automatic plot generation with gnuplot
-- Data export to text files
-- Verbose trajectory information
-- Unified build system for both algorithms
+#### Case 1: vmax reached  
+![Case 1](examples/images/acc_constant_1.png)
+
+Constraints: p0=50, pe=-90, v0=-5, ve=1, acc_max=1, vmax=10, t0=0
+
+## API Reference
+
+### TwoPointInterpolation (Constant Acceleration)
+
+```cpp
+void init(double p0, double pe, double acc_max, double vmax, 
+          double t0 = 0, double v0 = 0, double ve = 0, double dec_max = -1.0);
+double calcTrajectory();
+std::vector<double> getPoint(double t) const;  // Returns [pos, vel, acc]
+```
+
+### TwoPointInterpolationJerk (Constant Jerk)
+
+```cpp
+void init(double p0, double pe, double amax, double vmax, double jmax,
+          double t0 = 0, double v0 = 0, double ve = 0);
+double calcTrajectory();
+std::vector<double> getPoint(double t) const;  // Returns [pos, vel, acc, jerk]
+```
 
 ## Error Handling
 
-The library includes robust error handling for:
-- Invalid constraint values (negative or zero)
-- Uninitialized trajectory calculations
-- Physical impossibilities (same position, different velocities)
-- Missing required parameters
+The library validates:
+- ❌ Negative or zero constraints
+- ❌ Uninitialized trajectory calculations
+- ❌ Same position with different velocities (physically impossible)
+- ❌ Invalid trajectories (insufficient distance for given vmax)
 
-### Example result
-#### case 0: not reach velocity limit
-constraints: 
-- p0 = 10, pe = 170.0
-- v0 = -5, ve = 1
-- amax = 1, vmax = 100
-- t0 = 10
+## License
 
-![alt text](examples/images/acc_constant_0.png)
+Apache License 2.0 - see [LICENSE](LICENSE) file for details.
 
-#### case 1: reach velocity limit
-constraints: 
-- p0 = 50, pe = -90.0
-- v0 = -5, ve = 1
-- amax = 1, vmax = 10
-- t0 = 0
+This software is provided "AS IS" without warranty of any kind.
 
-![alt text](examples/images/acc_constant_1.png)
+## Related Projects
+
+- **Python Version**: [two_points_interpolation_py](https://github.com/yuokamoto/two_points_interpolation_py) - Detailed documentation, mathematical derivations, and pip-installable package
+
+## Contributing
+
+Issues and pull requests are welcome on [GitHub](https://github.com/yuokamoto/two_points_interpolation_cpp).

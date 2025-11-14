@@ -9,7 +9,7 @@
 
 #include <yaml-cpp/yaml.h>
 
-#include "../two_points_interpolation_constant_acc.hpp"
+#include "../include/two_point_interpolation/constant_acc.hpp"
 
 // Function to generate a Gnuplot script
 void generateGnuplotScript(const std::vector<double>& v1, const std::vector<double>& v2,
@@ -46,7 +46,7 @@ void saveVectorDataToFile(const std::vector<double>& v1, const std::vector<doubl
 
 // Function to load constraints from a YAML file
 bool loadConstraintsFromYaml(const std::string& filePath, double& p0, double& pe,
-                             double& v0, double& ve, double& amax, double& vmax,
+                             double& v0, double& ve, double& amax, double& dec_max, double& vmax,
                              double& t0, double& dt, bool& verbose, bool& normalize_angle) {
     try {
         YAML::Node config = YAML::LoadFile(filePath);
@@ -56,6 +56,14 @@ bool loadConstraintsFromYaml(const std::string& filePath, double& p0, double& pe
         v0 = config["v0"].as<double>();
         ve = config["ve"].as<double>();
         amax = config["amax"].as<double>();
+        
+        // dec_max is optional, defaults to -1 (which means use amax)
+        if (config["dec_max"]) {
+            dec_max = config["dec_max"].as<double>();
+        } else {
+            dec_max = -1.0;
+        }
+        
         vmax = config["vmax"].as<double>();
         t0 = config["t0"].as<double>();
         dt = config["dt"].as<double>();
@@ -83,15 +91,15 @@ int main(int argc, char* argv[]) {
     }
 
     // Load constraints from YAML
-    double p0, pe, v0, ve, amax, vmax, t0, dt;
+    double p0, pe, v0, ve, amax, dec_max, vmax, t0, dt;
     bool verbose, normalize_angle;
-    if (!loadConstraintsFromYaml(filename, p0, pe, v0, ve, amax, vmax, t0, dt, verbose, normalize_angle)) {
+    if (!loadConstraintsFromYaml(filename, p0, pe, v0, ve, amax, dec_max, vmax, t0, dt, verbose, normalize_angle)) {
         return 1;
     }
 
     // Generate trajectory
     TwoAngleInterpolation tpi(verbose);
-    const double te = tpi.calcTrajectory(p0, pe, amax, vmax, t0, v0, ve);
+    const double te = tpi.calcTrajectory(p0, pe, amax, vmax, t0, v0, ve, dec_max);
 
     // Simulation condition
     std::vector<double> tref;
