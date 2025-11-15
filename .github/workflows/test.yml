@@ -1,0 +1,41 @@
+name: C++ Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-cpp:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libyaml-cpp-dev gnuplot g++ cmake
+    
+    - name: Build and run tests
+      run: |
+        ./build_and_test.sh
+    
+    - name: Build examples
+      run: |
+        cd examples
+        ./build.sh
+    
+    - name: Verify no warnings
+      run: |
+        # Re-run build to capture output
+        g++ -std=c++11 -Wall -Wextra -O2 -Iinclude -o test_interpolation tests/test_interpolation.cpp 2>&1 | tee build.log
+        # Check if there are any warnings
+        if grep -i "warning:" build.log; then
+          echo "⚠️ Build warnings detected"
+          exit 1
+        else
+          echo "✅ No warnings detected"
+        fi
