@@ -12,10 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <iostream>
+#pragma once
+
+#include <algorithm>
 #include <cmath>
-#include <vector>
+#include <iostream>
 #include <stdexcept>
+#include <vector>
 
 inline double vInteg(const double v0, const double a, const double dt) {
     return v0 + a * dt;
