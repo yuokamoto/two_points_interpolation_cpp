@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <iostream>
+#pragma once
+
 #include <cmath>
-#include <vector>
+#include <iostream>
 #include <stdexcept>
+#include <vector>
 
 /**
  * Two-point interpolation with constant jerk constraints.
@@ -311,3 +313,4 @@ public:
         return {p, v, a, j};
     }
 };
+
