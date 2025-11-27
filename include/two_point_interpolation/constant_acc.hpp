@@ -188,7 +188,47 @@ public:
             } else if (dt01_minus > 0) {
                 dt01 = dt01_minus;
             } else {
-                throw std::runtime_error("No positive time solution found for trajectory");
+                // No positive solution: check if this is due to insufficient deceleration distance
+                // Calculate minimum distance required to decelerate from v0 to ve
+                // Using kinematic equation: d = (v0² - ve²) / (2 * dec)
+                double decel_distance = (_v0 * _v0 - _ve * _ve) / (2 * std::fabs(dec));
+                
+                // Check if moving toward target (sign * v0 > 0 means velocity and direction align)
+                if (sign * _v0 > 0 && std::fabs(decel_distance - std::fabs(dp)) < std::fabs(dp) * 0.02) {
+                    // Within 2%: nearly equal to available distance
+                    throw std::runtime_error(
+                        "Insufficient distance for trajectory planning: "
+                        "current velocity " + std::to_string(std::fabs(_v0)) + 
+                        " requires approximately " + std::to_string(decel_distance) + 
+                        " distance to reach target velocity " + std::to_string(std::fabs(_ve)) + 
+                        ", nearly equal to available distance " + std::to_string(std::fabs(dp)) + ". "
+                        "Difference: " + std::to_string(std::fabs(decel_distance - std::fabs(dp))) + 
+                        " (" + std::to_string(std::fabs(decel_distance - std::fabs(dp))/std::fabs(dp)*100) + "%). "
+                        "This typically occurs when the same goal is resent during motion. "
+                        "Consider checking if the goal has changed before recalculating trajectory."
+                    );
+                } else if (sign * _v0 > 0 && decel_distance > std::fabs(dp)) {
+                    // Deceleration distance exceeds available distance (more than 2%)
+                    throw std::runtime_error(
+                        "Insufficient distance to decelerate: "
+                        "current velocity " + std::to_string(std::fabs(_v0)) + 
+                        " requires " + std::to_string(decel_distance) + 
+                        " distance to reach target velocity " + std::to_string(std::fabs(_ve)) + 
+                        ", but only " + std::to_string(std::fabs(dp)) + " available. "
+                        "Shortage: " + std::to_string(decel_distance - std::fabs(dp)) + 
+                        " (" + std::to_string((decel_distance - std::fabs(dp))/std::fabs(dp)*100) + "%). "
+                        "Consider reducing initial velocity or increasing distance."
+                    );
+                } else {
+                    throw std::runtime_error(
+                        "No positive time solution found for trajectory. "
+                        "Distance: " + std::to_string(std::fabs(dp)) + 
+                        ", v0: " + std::to_string(std::fabs(_v0)) + 
+                        ", ve: " + std::to_string(std::fabs(_ve)) + 
+                        ", acc_max: " + std::to_string(_amax_accel) + 
+                        ", dec_max: " + std::to_string(_amax_decel)
+                    );
+                }
             }
             
             double v1 = vInteg(_v0, acc, dt01);
@@ -246,11 +286,52 @@ public:
                 _p.push_back(p2);
             }
         } else {
+            // Discriminant <= 0: no valid solution
+            // Check common causes for better error message
+            // Calculate minimum distance required to decelerate from v0 to ve
+            // Using kinematic equation: d = (v0² - ve²) / (2 * dec)
+            double decel_distance = (_v0 * _v0 - _ve * _ve) / (2 * std::fabs(dec));
+            
+            // Check if moving toward target (sign * v0 > 0 means velocity and direction align)
+            if (sign * _v0 > 0 && std::fabs(decel_distance - std::fabs(dp)) < std::fabs(dp) * 0.02) {
+                // Within 2%: deceleration distance is very close to available distance
+                throw std::runtime_error(
+                    "No valid trajectory found: "
+                    "current velocity " + std::to_string(std::fabs(_v0)) + 
+                    " requires approximately " + std::to_string(decel_distance) + 
+                    " distance to reach target velocity " + std::to_string(std::fabs(_ve)) + 
+                    ", nearly equal to available distance " + std::to_string(std::fabs(dp)) + ". "
+                    "This leaves no room for trajectory planning. "
+                    "This typically occurs when the same goal is resent during motion. "
+                    "Consider checking if the goal has changed before recalculating trajectory."
+                );
+            } else if (sign * _v0 > 0 && decel_distance > std::fabs(dp)) {
+                // Deceleration distance exceeds available distance (more than 2%)
+                throw std::runtime_error(
+                    "Insufficient distance to decelerate: "
+                    "current velocity " + std::to_string(std::fabs(_v0)) + 
+                    " requires " + std::to_string(decel_distance) + 
+                    " distance to reach target velocity " + std::to_string(std::fabs(_ve)) + 
+                    ", but only " + std::to_string(std::fabs(dp)) + " available. "
+                    "Shortage: " + std::to_string(decel_distance - std::fabs(dp)) + 
+                    " (" + std::to_string((decel_distance - std::fabs(dp))/std::fabs(dp)*100) + "%). "
+                    "Consider reducing initial velocity or increasing distance."
+                );
+            } else {
+                throw std::runtime_error(
+                    "No valid trajectory found (discriminant <= 0). "
+                    "The constraints might be too restrictive for the given end conditions. "
+                    "Distance: " + std::to_string(std::fabs(dp)) + 
+                    ", v0: " + std::to_string(std::fabs(_v0)) + 
+                    ", ve: " + std::to_string(std::fabs(_ve)) + 
+                    ", acc_max: " + std::to_string(_amax_accel) + 
+                    ", dec_max: " + std::to_string(_amax_decel) + 
+                    ", vmax: " + std::to_string(_vmax)
+                );
+            }
             if (_verbose) {
                 std::cout << "TwoPointInterpolation::calcTrajectory error" << std::endl;
             }
-            throw std::runtime_error("No valid trajectory found (discriminant < 0). "
-                                   "The constraints might be too restrictive for the given end conditions.");
         }
 
         if (_verbose) {
