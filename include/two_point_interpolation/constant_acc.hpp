@@ -205,6 +205,9 @@ public:
             // Acceleration phase duration. Not positive when the body already moves toward
             // pe at least as fast as v1, i.e. it cannot slow down to ve within |dp|.
             double dt01 = (v1 - _v0) / acc;
+            // TODO(two_points_interpolation_py#9): reverse profile (decelerate -> accelerate)
+            // for overshoot / back-up trajectories; both checks below would then have a
+            // trajectory to return.
             if (dt01 <= 0) {
                 throwCannotStopInTime(dp, dec, sign);
             }
@@ -406,15 +409,19 @@ private:
         throw std::runtime_error(msg.str());
     }
 
-    // ve is faster, in the direction of travel, than any speed reachable within |dp|.
+    // ve is faster, in the direction of travel, than any speed reachable within |dp|
+    // without first moving away from the target.
     [[noreturn]] void throwEndVelocityUnreachable(const double dp) const {
         // Accelerating toward the target over the whole distance (after first stopping,
-        // if v0 points away) ends at v^2 = v0^2 + 2 * acc_max * |dp|.
+        // if v0 points away) ends at v^2 = v0^2 + 2 * acc_max * |dp|. That is the limit
+        // for this accelerate-then-decelerate profile only: backing away first to gain
+        // run-up distance would reach ve (two_points_interpolation_py#9).
         const double reachable = std::sqrt(_v0 * _v0 + 2 * _amax_accel * std::fabs(dp));
         std::ostringstream msg;
         msg << std::fixed << std::setprecision(4)
-            << "End velocity unreachable: the highest speed reachable within distance "
-            << std::fabs(dp) << " from v0 " << _v0 << " is " << reachable << ", but ve " << _ve
+            << "End velocity unreachable without first moving away from the target: "
+            << "the highest speed reachable over distance " << std::fabs(dp) << " from v0 "
+            << _v0 << " is " << reachable << ", but ve " << _ve
             << " was requested. acc_max: " << _amax_accel << ", dec_max: " << _amax_decel;
         throw std::runtime_error(msg.str());
     }

@@ -36,11 +36,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Updated examples to demonstrate `dec_max` parameter
 - **Behaviour change**: inputs that used to return a wrong trajectory now throw
   `std::runtime_error`. These are requests whose end velocity `ve` is faster, toward
-  `pe`, than any speed reachable within the distance; the trajectory returned for them
+  `pe`, than any speed reachable within the distance without first moving away from
+  `pe`; the trajectory returned for them
   never ended at `pe`. Inputs that produced a correct trajectory are unaffected.
 - Error messages name the actual cause: "Insufficient distance to decelerate ..." when
   the body moves toward `pe` too fast to slow down to `ve`, and "End velocity
-  unreachable ..." with the highest reachable speed when `ve` cannot be reached. The
+  unreachable without first moving away from the target ..." with the highest speed
+  reachable over the distance. A profile that backs away or overshoots is not built
+  (two_points_interpolation_py#9). The
   messages referring to a discriminant or to "no positive time solution" are gone,
   since the quadratic is no longer solved.
 
