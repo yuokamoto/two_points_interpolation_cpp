@@ -375,6 +375,181 @@ void testConstantJerkErrorHandling() {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Initial velocity away from the target, end-velocity feasibility, rounding
+// ---------------------------------------------------------------------------
+
+void check(bool condition, const std::string& what) {
+    if (!condition) {
+        throw std::runtime_error(what);
+    }
+}
+
+// Position and velocity just before the end time: getPoint() returns (pe, ve)
+// from the end time on, which would hide a trajectory that misses the target.
+std::vector<double> stateJustBeforeEnd(const TwoPointInterpolation& tpi, double t0, double total_time) {
+    return tpi.getPoint(t0 + total_time - 1e-9);
+}
+
+std::string describe(double p0, double pe, double v0, double acc, double dec, double vmax, double ve) {
+    return "p0=" + std::to_string(p0) + " pe=" + std::to_string(pe) + " v0=" + std::to_string(v0) +
+           " acc=" + std::to_string(acc) + " dec=" + std::to_string(dec) + " vmax=" + std::to_string(vmax) +
+           " ve=" + std::to_string(ve);
+}
+
+void checkReachesTarget(double p0, double pe, double v0, double acc, double dec, double vmax, double ve) {
+    TwoPointInterpolation tpi;
+    tpi.init(p0, pe, acc, vmax, 0.0, v0, ve, dec);
+    double total = tpi.calcTrajectory();
+    auto end = stateJustBeforeEnd(tpi, 0.0, total);
+    check(almostEqual(end[0], pe, 1e-6) && almostEqual(end[1], ve, 1e-6),
+          "does not end at (pe, ve): " + describe(p0, pe, v0, acc, dec, vmax, ve) + " -> p=" +
+              std::to_string(end[0]) + " v=" + std::to_string(end[1]));
+}
+
+void testMovingAwayStillReachesTheTarget() {
+    std::cout << "Testing an initial velocity away from the target..." << std::endl;
+    const double accs[] = {1.0, 2.0};
+    const double decs[] = {1.0, 3.0};
+    const double vmaxs[] = {2.0, 10.0};  // reached and not reached
+    const double ves[] = {0.0, 0.5};
+    const double v0s[] = {-0.5, -2.0, -4.0};
+    int n = 0;
+    // A short distance is what makes both roots of the old quadratic positive.
+    for (double dp : {1.0, 10.0}) {
+        for (double direction : {1.0, -1.0}) {
+            for (double acc : accs) {
+                for (double dec : decs) {
+                    for (double vmax : vmaxs) {
+                        for (double ve : ves) {
+                            for (double v0 : v0s) {
+                                checkReachesTarget(0.0, direction * dp, direction * v0, acc, dec, vmax, direction * ve);
+                                ++n;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    std::cout << "✅ " << n << " trajectories starting away from the target reach it" << std::endl;
+}
+
+void testTheReportedCase() {
+    std::cout << "Testing the reported case (p0=0, pe=1, v0=-2, a=d=1)..." << std::endl;
+    TwoPointInterpolation tpi;
+    tpi.init(0.0, 1.0, 1.0, 10.0, 0.0, -2.0, 0.0, 1.0);
+    double total = tpi.calcTrajectory();
+    // It slows from -2 to 0 over 2 m before turning back.
+    auto turn = tpi.getPoint(2.0);
+    check(almostEqual(turn[0], -2.0, 1e-9) && almostEqual(turn[1], 0.0, 1e-9), "does not turn back at -2");
+    auto end = stateJustBeforeEnd(tpi, 0.0, total);
+    check(almostEqual(end[0], 1.0, 1e-6) && almostEqual(end[1], 0.0, 1e-6), "does not end at the target");
+    std::cout << "✅ Turns back at -2 and ends at the target" << std::endl;
+}
+
+void testAccelerationOnlyArrival() {
+    std::cout << "Testing acceleration-only arrivals (ve at the peak)..." << std::endl;
+    int n = 0;
+    for (double direction : {1.0, -1.0}) {
+        for (double v0_toward : {0.0, -1.0, 0.5}) {
+            const double cases[][2] = {{15.0, 0.3}, {1.0, 2.0}, {7.3, 0.7}};
+            for (const auto& c : cases) {
+                const double dp = c[0], acc = c[1];
+                const double v0 = v0_toward * direction;
+                const double ve = direction * std::sqrt(v0_toward * v0_toward + 2 * acc * dp);
+                checkReachesTarget(0.0, direction * dp, v0, acc, 0.5, 100.0, ve);
+                ++n;
+            }
+        }
+    }
+    // The case from review: v1 comes out as 2.9999999999999996.
+    checkReachesTarget(0.0, 15.0, 0.0, 0.3, 0.5, 5.0, 3.0);
+    std::cout << "✅ " << n + 1 << " acceleration-only arrivals are accepted" << std::endl;
+}
+
+void expectError(double p0, double pe, double v0, double acc, double dec, double vmax, double ve,
+                 const std::string& expected) {
+    TwoPointInterpolation tpi;
+    tpi.init(p0, pe, acc, vmax, 0.0, v0, ve, dec);
+    try {
+        tpi.calcTrajectory();
+    } catch (const std::runtime_error& e) {
+        check(std::string(e.what()).find(expected) != std::string::npos,
+              "unexpected message for " + describe(p0, pe, v0, acc, dec, vmax, ve) + ": " + e.what());
+        return;
+    }
+    throw std::runtime_error("expected an error for " + describe(p0, pe, v0, acc, dec, vmax, ve));
+}
+
+void testInfeasibleRequestsThrow() {
+    std::cout << "Testing infeasible requests..." << std::endl;
+    // Toward the target too fast to stop within 1 m: needs 2 m.
+    expectError(0.0, 1.0, 2.0, 1.0, 1.0, 10.0, 0.0, "Insufficient distance to decelerate");
+    // ve beyond the highest reachable speed sqrt(0 + 2 * 1 * 1) = 1.4142.
+    expectError(0.0, 1.0, 0.0, 1.0, 1.0, 10.0, 2.0, "End velocity unreachable");
+    expectError(0.0, 1.0, 0.0, 1.0, 1.0, 10.0, 2.0, "is 1.4142, but ve 2.0000 was requested");
+    std::cout << "✅ Infeasible requests throw with their cause" << std::endl;
+}
+
+void testEveryReturnedTrajectoryIsValid() {
+    std::cout << "Testing a grid of requests (every returned trajectory)..." << std::endl;
+    int built = 0, refused = 0;
+    for (double v0 : {-3.0, -1.0, 0.0, 0.5, 2.0}) {
+        for (double dp : {-6.0, -0.7, 0.4, 3.0, 12.0}) {
+            for (double acc : {0.5, 2.0}) {
+                for (double dec : {0.5, 3.0}) {
+                    for (double vmax : {1.5, 4.0}) {
+                        for (double ve_mag : {0.0, 0.8}) {
+                            for (double ve_sign : {1.0, -1.0}) {
+                                // ve_sign < 0: ve points away from pe (pass it and come back)
+                                const double ve = ve_sign * ve_mag * (dp > 0 ? 1.0 : -1.0);
+                                TwoPointInterpolation tpi;
+                                tpi.init(0.0, dp, acc, vmax, 0.0, v0, ve, dec);
+                                double total;
+                                try {
+                                    total = tpi.calcTrajectory();
+                                } catch (const std::runtime_error&) {
+                                    ++refused;
+                                    continue;
+                                }
+                                ++built;
+                                const std::string where = describe(0.0, dp, v0, acc, dec, vmax, ve);
+                                auto end = stateJustBeforeEnd(tpi, 0.0, total);
+                                check(almostEqual(end[0], dp, 1e-6) && almostEqual(end[1], ve, 1e-6),
+                                      "does not end at (pe, ve): " + where);
+                                for (double dt : tpi.getDt()) {
+                                    check(dt >= -1e-12, "negative phase duration: " + where);
+                                }
+                                const double vcap = std::max(vmax, std::fabs(v0)) + 1e-9;
+                                for (int i = 0; i <= 200; ++i) {
+                                    auto s = tpi.getPoint(total * i / 200.0);
+                                    check(std::fabs(s[1]) <= vcap, "speed above max(vmax, |v0|): " + where);
+                                    check(std::fabs(s[2]) <= std::max(acc, dec) + 1e-9,
+                                          "acceleration above its limits: " + where);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    std::cout << "✅ " << built << " returned trajectories are valid (" << refused << " refused)" << std::endl;
+}
+
+void testAngleTurningAwayFromItsTarget() {
+    std::cout << "Testing an angle starting to turn away from its target..." << std::endl;
+    // 350 deg to 10 deg is +20 deg the short way; start turning at -1 rad/s.
+    TwoAngleInterpolation tai;
+    const double pe = 10.0 * M_PI / 180.0;
+    tai.init(350.0 * M_PI / 180.0, pe, 1.0, 3.0, 0.0, -1.0, 0.0, 1.0);
+    double total = tai.calcTrajectory(350.0 * M_PI / 180.0, pe, 1.0, 3.0, 0.0, -1.0, 0.0, 1.0);
+    auto end = tai.getPoint(total - 1e-9);
+    check(almostEqual(end[0], pe, 1e-6) && almostEqual(end[1], 0.0, 1e-6), "angle does not end at its target");
+    std::cout << "✅ The angle reaches its target" << std::endl;
+}
+
 int main() {
     std::cout << "=== C++ Two Points Interpolation Test Suite ===" << std::endl;
     std::cout << "Testing constant acceleration interpolation with dec_max support\n" << std::endl;
@@ -392,6 +567,14 @@ int main() {
         // Feature tests
         testFasterDeceleration();
         testDefaultDecMax();
+
+        // Initial velocity away from the target and end-velocity feasibility
+        testMovingAwayStillReachesTheTarget();
+        testTheReportedCase();
+        testAccelerationOnlyArrival();
+        testInfeasibleRequestsThrow();
+        testEveryReturnedTrajectoryIsValid();
+        testAngleTurningAwayFromItsTarget();
         
         // Jerk tests (basic)
         testConstantJerkBasic();

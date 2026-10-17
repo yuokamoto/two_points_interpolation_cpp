@@ -112,6 +112,7 @@ cd examples
 # Run examples with Python-matching parameters (recommended)
 ./build_and_run.sh acc constraints_case0.yaml  # Case 0: vmax not reached
 ./build_and_run.sh acc constraints_case1.yaml  # Case 1: vmax reached
+./build_and_run.sh acc constraints_case2.yaml  # Initial velocity away from the target
 
 # Run constant jerk example
 ./build_and_run.sh jerk constraints_jerk.yaml
@@ -140,6 +141,13 @@ Trajectory when the peak velocity is below vmax. Shows two phases: acceleration 
 
 Trajectory when vmax is reached. Shows three phases: acceleration, constant velocity, and deceleration.
 
+#### Initial velocity away from the target
+![Initial velocity away from the target](examples/images/acc_constant_2.png)
+
+**Parameters**: `t0=0, p0=0, pe=10, acc_max=2.0, dec_max=3.0, vmax=5.0, v0=-3.0, ve=0`
+
+The body starts moving away from the target. The first phase accelerates toward the target, so it slows down, turns back at t=1.5 s (p=-2.25) and speeds up toward the target; the trajectory then cruises at vmax and decelerates onto it. The slowing down before the turn is part of the acceleration phase, so it is bounded by `acc_max`, not `dec_max`.
+
 ## API Reference
 
 ### TwoPointInterpolation (Constant Acceleration)
@@ -167,6 +175,8 @@ The library validates:
 - ❌ Uninitialized trajectory calculations
 - ❌ Same position with different velocities (physically impossible)
 - ❌ Invalid trajectories (insufficient distance for given vmax)
+- ❌ Moving toward the target too fast to slow down to `ve` within the distance ("Insufficient distance to decelerate ...")
+- ❌ An end velocity `ve` faster than any speed reachable within the distance ("End velocity unreachable: ... is Y, but ve Z was requested")
 
 ## License
 

@@ -11,6 +11,7 @@ This directory contains example applications demonstrating the use of the two-po
 ### Configuration Files  
 - `constraints_case0.yaml` - Case 0: vmax not reached (matches Python example)
 - `constraints_case1.yaml` - Case 1: vmax reached (matches Python example)
+- `constraints_case2.yaml` - Initial velocity away from the target (matches Python example)
 - `constraints_jerk.yaml` - Parameters for jerk example
 
 ### Build Scripts
