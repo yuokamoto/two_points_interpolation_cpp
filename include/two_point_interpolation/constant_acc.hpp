@@ -22,9 +22,10 @@
 #include <stdexcept>
 #include <vector>
 
-// Relative tolerance within which a computed peak velocity counts as equal to ve
-// (an acceleration-only arrival), absorbing square-root rounding.
-constexpr double PEAK_VELOCITY_REL_TOL = 1e-9;
+// Relative tolerance for recognising an acceleration-only arrival despite
+// square-root rounding: both the peak velocity against ve and the distance
+// covered by accelerating from v0 to ve against |dp| must agree within it.
+constexpr double ACCELERATION_ONLY_REL_TOL = 1e-9;
 
 inline double vInteg(const double v0, const double a, const double dt) {
     return v0 + a * dt;
@@ -187,13 +188,18 @@ public:
             double v1 = sign * std::sqrt(v1_sq);
 
             // An acceleration-only arrival has v1 == ve exactly in real arithmetic, but
-            // the square root can land a rounding error below ve. Snap a peak that is
-            // within rounding of ve onto it, so the deceleration phase has zero length
-            // instead of the trajectory being refused as unreachable.
+            // the square root can land a rounding error below ve. Snap the peak onto ve,
+            // so the deceleration phase has zero length instead of the trajectory being
+            // refused as unreachable -- but only when it really is one: accelerating from
+            // v0 to ve must cover |dp|. A peak close to ve alone is not enough (a tiny
+            // dec_max puts the peak near ve while ve is far out of reach).
             const double gap = sign * (_ve - v1);
-            if (gap > 0 &&
-                gap <= PEAK_VELOCITY_REL_TOL * std::max(std::max(std::fabs(v1), std::fabs(_ve)), 1.0)) {
-                v1 = _ve;
+            if (gap > 0 && gap <= ACCELERATION_ONLY_REL_TOL * std::max(std::fabs(v1), std::fabs(_ve))) {
+                const double acceleration_only_distance = (_ve * _ve - _v0 * _v0) / (2 * a_mag);
+                const double distance_error = std::fabs(acceleration_only_distance - std::fabs(dp));
+                if (distance_error <= ACCELERATION_ONLY_REL_TOL * std::fabs(dp)) {
+                    v1 = _ve;
+                }
             }
 
             // Acceleration phase duration. Not positive when the body already moves toward
