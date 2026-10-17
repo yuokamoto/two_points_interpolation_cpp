@@ -558,7 +558,8 @@ void testInfeasibleRequestsThrow() {
     // Toward the target too fast to stop within 1 m: needs 2 m.
     expectError(0.0, 1.0, 2.0, 1.0, 1.0, 10.0, 0.0, "Insufficient distance to decelerate");
     // ve beyond the highest reachable speed sqrt(0 + 2 * 1 * 1) = 1.4142.
-    expectError(0.0, 1.0, 0.0, 1.0, 1.0, 10.0, 2.0, "End velocity unreachable");
+    expectError(0.0, 1.0, 0.0, 1.0, 1.0, 10.0, 2.0,
+                "End velocity unreachable without first moving away from the target");
     expectError(0.0, 1.0, 0.0, 1.0, 1.0, 10.0, 2.0, "is 1.4142, but ve 2.0000 was requested");
     // The Python suite's error cases: from rest, and starting away from the target.
     expectError(0.0, 0.1, 0.0, 1.0, 1.0, 5.0, 2.0, "is 0.4472, but ve 2.0000 was requested");

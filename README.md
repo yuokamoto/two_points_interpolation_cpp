@@ -176,7 +176,7 @@ The library validates:
 - ❌ Same position with different velocities (physically impossible)
 - ❌ Invalid trajectories (insufficient distance for given vmax)
 - ❌ Moving toward the target too fast to slow down to `ve` within the distance ("Insufficient distance to decelerate ...")
-- ❌ An end velocity `ve` faster than any speed reachable within the distance ("End velocity unreachable: ... is Y, but ve Z was requested")
+- ❌ An end velocity `ve` faster than any speed reachable within the distance without first moving away from the target ("End velocity unreachable without first moving away from the target: ... is Y, but ve Z was requested"). A profile that backs away or overshoots is not built ([two_points_interpolation_py#9](https://github.com/yuokamoto/two_points_interpolation_py/issues/9)).
 
 ## License
 
