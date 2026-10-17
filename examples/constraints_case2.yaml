@@ -1,0 +1,12 @@
+# Initial velocity away from the target (matches Python example)
+p0: 0.0
+pe: 10.0
+v0: -3.0
+ve: 0.0
+amax: 2.0
+dec_max: 3.0
+vmax: 5.0
+t0: 0.0
+dt: 0.01
+verbose: true
+normalize_angle: false
