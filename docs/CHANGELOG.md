@@ -20,7 +20,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   (`examples/constraints_case2.yaml`, `examples/images/acc_constant_2.png`)
 - Tests for an initial velocity away from the target, acceleration-only arrivals,
   infeasible requests, a grid check that every returned trajectory ends at (`pe`, `ve`)
-  within its limits, and an angle turning away from its target
+  within its limits, and an angle turning away from its target. A table of concrete
+  cases mirrors the Python suite's `initial_velocity_away_tests` and
+  `end_velocity_tests`.
+- Every final-state check also samples just before the end time: `getPoint()` returns
+  (`pe`, `ve`) from the end time on, which hid trajectories that did not arrive there
 
 ### Changed
 - Fixed quadratic equation solver to properly handle forward/backward motion
@@ -55,7 +59,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
     the direction of travel. Results are unchanged wherever the old root was correct.
   - An acceleration-only arrival (`ve` exactly the speed reached by accelerating over
     the whole distance) is accepted despite square-root rounding: a peak within a
-    relative `1e-9` of `ve` is snapped onto it.
+    relative `1e-9` of `ve` is snapped onto it, but only when accelerating from `v0`
+    to `ve` covers `|dp|` within the same relative tolerance: a peak close to `ve`
+    alone, e.g. with a tiny `dec_max`, is not an acceleration-only arrival.
 - **Initial velocity above vmax toward the target**: the vmax case accelerated from
   `v0` to `vmax` even when `v0` was already faster, giving a negative phase duration.
   It now decelerates to `vmax` first, as the Python version does.

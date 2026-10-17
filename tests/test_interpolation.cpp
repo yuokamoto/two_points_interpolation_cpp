@@ -16,6 +16,7 @@
 #include <cassert>
 #include <cmath>
 #include <vector>
+#include <algorithm>
 #include <stdexcept>
 #include <string>
 
@@ -44,6 +45,18 @@ void assertFinalState(const TwoPointInterpolation& tpi, double total_time,
     }
     if (!almostEqual(0.0, a_final)) {
         throw std::runtime_error("Final acceleration should be zero, got " + std::to_string(a_final));
+    }
+
+    // getPoint() returns exactly (pe, ve) from the end time on, so the check above
+    // cannot see a trajectory that does not arrive there. Check just before it too.
+    if (total_time > 0) {
+        auto before_end = tpi.getPoint(total_time - 1e-9);
+        if (!almostEqual(expected_pe, before_end[0], 1e-6) || !almostEqual(expected_ve, before_end[1], 1e-6)) {
+            throw std::runtime_error("Trajectory does not arrive at the target: just before the end p=" +
+                                     std::to_string(before_end[0]) + " v=" + std::to_string(before_end[1]) +
+                                     ", expected (" + std::to_string(expected_pe) + ", " +
+                                     std::to_string(expected_ve) + ")");
+        }
     }
 }
 
@@ -435,17 +448,77 @@ void testMovingAwayStillReachesTheTarget() {
     std::cout << "✅ " << n << " trajectories starting away from the target reach it" << std::endl;
 }
 
-void testTheReportedCase() {
-    std::cout << "Testing the reported case (p0=0, pe=1, v0=-2, a=d=1)..." << std::endl;
-    TwoPointInterpolation tpi;
-    tpi.init(0.0, 1.0, 1.0, 10.0, 0.0, -2.0, 0.0, 1.0);
-    double total = tpi.calcTrajectory();
-    // It slows from -2 to 0 over 2 m before turning back.
-    auto turn = tpi.getPoint(2.0);
-    check(almostEqual(turn[0], -2.0, 1e-9) && almostEqual(turn[1], 0.0, 1e-9), "does not turn back at -2");
-    auto end = stateJustBeforeEnd(tpi, 0.0, total);
-    check(almostEqual(end[0], 1.0, 1e-6) && almostEqual(end[1], 0.0, 1e-6), "does not end at the target");
-    std::cout << "✅ Turns back at -2 and ends at the target" << std::endl;
+// Concrete cases, the same as the Python suite's initial_velocity_away_tests and
+// end_velocity_tests. The away cases sit in the regime where the old quadratic
+// had two positive roots: v0 away from pe and (v0^2 - ve^2) / (2 * dec_max) > |dp|.
+struct ConcreteCase {
+    TestCase tc;
+    int phases;          // 2: vmax not reached, 3: vmax reached
+    double total_time;
+    double v1;           // velocity at the end of the acceleration phase (NAN: unchecked)
+    double p_min;        // lowest position along the trajectory (NAN: unchecked)
+    double p_max;        // highest position along the trajectory (NAN: unchecked)
+    double final_phase;  // duration of the last phase (NAN: unchecked)
+};
+
+void testConcreteCases() {
+    std::cout << "Testing concrete cases (initial velocity away, end velocity)..." << std::endl;
+    const double X = NAN;
+    const std::vector<ConcreteCase> cases = {
+        {{0, 1, 1.0, 1.0, 3.0, -2.0, 0.0, "the reported case"}, 2, 5.464102, 1.732051, -2.0, X, X},
+        {{0, 1, 1.0, 2.0, 4.0, -3.0, 0.0, "away, dec_max > acc_max"}, 2, 7.062019, 2.708013, -4.5, X, X},
+        {{0, 1, 2.0, 1.0, 3.0, -2.0, 0.0, "away, acc_max > dec_max"}, 2, 3.449490, 1.632993, -1.0, X, X},
+        {{0, 1, 1.0, 1.0, 1.5, -2.0, 0.0, "away, vmax reached"}, 3, 5.5, 1.5, -2.0, X, X},
+        {{0, 1, 1.0, 1.0, 1.5, -4.0, 0.0, "away and above vmax"}, 3, 11.5, 1.5, -8.0, X, X},
+        {{0, 1, 1.0, 1.0, 3.0, -2.0, 0.5, "away, non-zero ve"}, 2, 5.035534, 1.767767, -2.0, X, X},
+        {{0, 1, 1.0, 2.0, 1.5, -3.0, 0.5, "away, asymmetric, vmax reached, non-zero ve"}, 3, 7.583333, 1.5, -4.5, X, X},
+        {{0, -1, 1.0, 1.0, 3.0, 2.0, 0.0, "away from a target behind"}, 2, 5.464102, -1.732051, X, 2.0, X},
+        {{0, -1, 1.0, 1.0, 1.5, 2.0, -0.5, "away from a target behind, vmax reached, non-zero ve"}, 3, 5.083333, -1.5, X, 2.0, X},
+        {{0, 1, 1.0, 1.0, 3.0, 0.0, -0.5, "ve away from the target: pass pe and come back"}, 2, 2.621320, 1.060660, X, 1.125, X},
+        // sqrt(2 * 0.3 * 15) = 3, but the computed peak is 2.9999999999999996.
+        {{0, 15, 0.3, 0.5, 5.0, 0.0, 3.0, "acceleration-only arrival"}, 2, 10.0, 3.0, X, X, 0.0},
+        {{0, 15, 0.3, 0.5, 5.0, -1.0, std::sqrt(10.0), "acceleration-only arrival, starting away"}, 2, 13.874259, std::sqrt(10.0), -1.666667, X, 0.0},
+        {{0, -15, 0.3, 0.5, 5.0, 0.0, -3.0, "acceleration-only arrival, negative direction"}, 2, 10.0, -3.0, X, X, 0.0},
+    };
+    for (const auto& c : cases) {
+        const TestCase& tc = c.tc;
+        try {
+            TwoPointInterpolation tpi;
+            tpi.init(tc.p0, tc.pe, tc.acc_max, tc.vmax, 0.0, tc.v0, tc.ve, tc.dec_max);
+            const double total = tpi.calcTrajectory();
+            const auto& dt = tpi.getDt();
+            check(static_cast<int>(dt.size()) == c.phases, "wrong number of phases: " + std::to_string(dt.size()));
+            check(almostEqual(total, c.total_time, 1e-5), "wrong total time " + std::to_string(total));
+            assertFinalState(tpi, total, tc.pe, tc.ve);
+            assertBoundaryContinuity(tpi);
+            if (!std::isnan(c.v1)) {
+                const double v1 = tpi.getPoint(dt[0])[1];
+                check(almostEqual(v1, c.v1, 1e-5), "wrong peak velocity " + std::to_string(v1));
+            }
+            if (!std::isnan(c.final_phase)) {
+                check(almostEqual(dt.back(), c.final_phase, 1e-6), "wrong final phase duration " + std::to_string(dt.back()));
+            }
+            if (!std::isnan(c.p_min) || !std::isnan(c.p_max)) {
+                double lo = tc.p0, hi = tc.p0;
+                for (int i = 0; i <= 40000; ++i) {
+                    const double p = tpi.getPoint(total * i / 40000.0)[0];
+                    lo = std::min(lo, p);
+                    hi = std::max(hi, p);
+                }
+                if (!std::isnan(c.p_min)) {
+                    check(almostEqual(lo, c.p_min, 1e-3), "wrong lowest position " + std::to_string(lo));
+                }
+                if (!std::isnan(c.p_max)) {
+                    check(almostEqual(hi, c.p_max, 1e-3), "wrong highest position " + std::to_string(hi));
+                }
+            }
+        } catch (const std::exception& e) {
+            std::cout << "❌ Test failed for: " << tc.description << std::endl;
+            std::cout << "   Error: " << e.what() << std::endl;
+            throw;
+        }
+    }
+    std::cout << "✅ All " << cases.size() << " concrete cases passed" << std::endl;
 }
 
 void testAccelerationOnlyArrival() {
@@ -463,9 +536,7 @@ void testAccelerationOnlyArrival() {
             }
         }
     }
-    // The case from review: v1 comes out as 2.9999999999999996.
-    checkReachesTarget(0.0, 15.0, 0.0, 0.3, 0.5, 5.0, 3.0);
-    std::cout << "✅ " << n + 1 << " acceleration-only arrivals are accepted" << std::endl;
+    std::cout << "✅ " << n << " acceleration-only arrivals are accepted" << std::endl;
 }
 
 void expectError(double p0, double pe, double v0, double acc, double dec, double vmax, double ve,
@@ -489,6 +560,14 @@ void testInfeasibleRequestsThrow() {
     // ve beyond the highest reachable speed sqrt(0 + 2 * 1 * 1) = 1.4142.
     expectError(0.0, 1.0, 0.0, 1.0, 1.0, 10.0, 2.0, "End velocity unreachable");
     expectError(0.0, 1.0, 0.0, 1.0, 1.0, 10.0, 2.0, "is 1.4142, but ve 2.0000 was requested");
+    // The Python suite's error cases: from rest, and starting away from the target.
+    expectError(0.0, 0.1, 0.0, 1.0, 1.0, 5.0, 2.0, "is 0.4472, but ve 2.0000 was requested");
+    expectError(0.0, 0.3, -0.5, 0.5, 0.5, 1.5, 1.0, "is 0.7416, but ve 1.0000 was requested");
+    // A peak near ve is not an acceleration-only arrival by itself: with a tiny
+    // dec_max the peak is 1.9999999995, but reaching 2 needs 2 m, not 1 m.
+    expectError(0.0, 1.0, 0.0, 1.0, 1e-9, 3.0, 2.0, "is 1.4142, but ve 2.0000 was requested");
+    // The rounding tolerance is purely relative; an absolute floor accepted this.
+    expectError(0.0, 0.1, 0.0, 1e-18, 1e-18, 1e-8, 1e-9, "End velocity unreachable");
     std::cout << "✅ Infeasible requests throw with their cause" << std::endl;
 }
 
@@ -570,7 +649,7 @@ int main() {
 
         // Initial velocity away from the target and end-velocity feasibility
         testMovingAwayStillReachesTheTarget();
-        testTheReportedCase();
+        testConcreteCases();
         testAccelerationOnlyArrival();
         testInfeasibleRequestsThrow();
         testEveryReturnedTrajectoryIsValid();
