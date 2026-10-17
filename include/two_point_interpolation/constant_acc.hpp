@@ -396,8 +396,9 @@ private:
                 << std::fabs(_ve) << ", but only " << std::fabs(dp) << " available. "
                 << "Consider reducing initial velocity or increasing distance.";
         } else {
-            // Boundary: the body arrives exactly at the deceleration distance (no time
-            // left to accelerate). Not reachable with a positive acceleration phase.
+            // Exact boundary: the deceleration distance equals |dp| (t1 == 0), so a
+            // pure deceleration would arrive exactly. Refused, as before; tracked as
+            // a follow-up in two_points_interpolation_py#8.
             msg << "Insufficient distance for trajectory planning: no time is left for the "
                 << "acceleration phase. Distance: " << std::fabs(dp) << ", v0: " << _v0
                 << ", ve: " << _ve << ", acc_max: " << _amax_accel << ", dec_max: " << _amax_decel;
