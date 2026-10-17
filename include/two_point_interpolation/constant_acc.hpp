@@ -152,6 +152,8 @@ public:
                 _trajectoryCalced = true;
                 return 0.0;
             } else {
+                // TODO(two_points_interpolation_py#9): reverse profile -- move away and come
+                // back to change speed without changing position.
                 throw std::invalid_argument("Cannot have different velocities at the same position (dp=0, but dv!=0)");
             }
         }
