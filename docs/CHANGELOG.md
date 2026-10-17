@@ -37,15 +37,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Behaviour change**: inputs that used to return a wrong trajectory now throw
   `std::runtime_error`. These are requests whose end velocity `ve` is faster, toward
   `pe`, than any speed reachable within the distance without first moving away from
-  `pe`; the trajectory returned for them
-  never ended at `pe`. Inputs that produced a correct trajectory are unaffected.
+  `pe`; the trajectory returned for them never ended at `pe`. Inputs that produced a
+  correct trajectory are unaffected.
 - Error messages name the actual cause: "Insufficient distance to decelerate ..." when
   the body moves toward `pe` too fast to slow down to `ve`, and "End velocity
   unreachable without first moving away from the target ..." with the highest speed
   reachable over the distance. A profile that backs away or overshoots is not built
-  (two_points_interpolation_py#9). The
-  messages referring to a discriminant or to "no positive time solution" are gone,
-  since the quadratic is no longer solved.
+  (two_points_interpolation_py#9). The messages referring to a discriminant or to
+  "no positive time solution" are gone, since the quadratic is no longer solved.
 
 ### Fixed
 - Discriminant calculation for asymmetric acceleration/deceleration
@@ -54,9 +53,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   trajectory that never reaches `pe` when `v0` points away from it.
   - The acceleration time was taken as the smaller positive root of a quadratic whose
     two roots correspond to a peak velocity `v1` of `+|v1|` and `-|v1|`. When `v0`
-    points away from `pe` over a short enough distance, both roots are positive and
-    the smaller one can be the `-|v1|` root: the acceleration phase ends still moving
-    away, and the deceleration phase drives further away. `getPoint()` returns `pe`
+    points away from `pe` over a short enough distance (`(v0² - ve²)/(2*dmax) > |dp|`),
+    both roots are positive and the smaller one is always the `-|v1|` root, since
+    `t1 = (v1 - v0)/acc` grows with `v1` along the direction of travel: the
+    acceleration phase ends still moving away, and the deceleration phase drives
+    further away. `getPoint()` returns `pe`
     from the end time on, so the result only showed as a jump at the end.
   - `v1` is now computed directly from the distance equation and takes its sign from
     the direction of travel. Results are unchanged wherever the old root was correct.
