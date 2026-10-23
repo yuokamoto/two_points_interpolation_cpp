@@ -305,8 +305,8 @@ public:
             }
             std::cout << std::endl;
             std::cout << "a ";
-            for (double acc : _a) {
-                std::cout << acc << " ";
+            for (double a_i : _a) {
+                std::cout << a_i << " ";
             }
             std::cout << std::endl;
             std::cout << "v ";
