@@ -555,8 +555,9 @@ void expectError(double p0, double pe, double v0, double acc, double dec, double
 
 void testInfeasibleRequestsThrow() {
     std::cout << "Testing infeasible requests..." << std::endl;
-    // Toward the target too fast to stop within 1 m: needs 2 m.
-    expectError(0.0, 1.0, 2.0, 1.0, 1.0, 10.0, 0.0, "Insufficient distance to decelerate");
+    // Toward the target too fast to slow down to ve = 0.5 within 1 m (needs 1.875 m); with
+    // ve still pointing ahead, stopping and coming back cannot arrive with it either.
+    expectError(0.0, 1.0, 2.0, 1.0, 1.0, 10.0, 0.5, "Insufficient distance to decelerate");
     // ve beyond the highest reachable speed sqrt(0 + 2 * 1 * 1) = 1.4142.
     expectError(0.0, 1.0, 0.0, 1.0, 1.0, 10.0, 2.0,
                 "End velocity unreachable without first moving away from the target");
@@ -618,6 +619,49 @@ void testEveryReturnedTrajectoryIsValid() {
     std::cout << "✅ " << built << " returned trajectories are valid (" << refused << " refused)" << std::endl;
 }
 
+// Case 2: too fast to stop before the target, so brake to a standstill beyond it and
+// come back. Durations and the farthest point follow from v0^2 / (2 * dec_max).
+void testOvershootStopsAndComesBack() {
+    std::cout << "Testing a target too close to stop before it..." << std::endl;
+    struct Overshoot {
+        double p0, pe, v0, acc, dec, vmax;
+        double total_time;
+        double p_far;  // where the body stands still before coming back
+    };
+    const std::vector<Overshoot> cases = {
+        // Stops at 2 after 2 s, then 1 m back from rest: 1 s up to 1 m/s, 1 s down.
+        {0.0, 1.0, 2.0, 1.0, 1.0, 10.0, 4.0, 2.0},
+        {0.0, -1.0, -2.0, 1.0, 1.0, 10.0, 4.0, -2.0},
+        // Same position, still moving: stops 0.25 m on, then 0.25 m back (2 * sqrt(0.5) / 2 s).
+        {10.0, 10.0, 1.0, 2.0, 2.0, 5.0, 0.5 + std::sqrt(0.5), 10.25},
+        // The UE robot of the report: 2.4 m/s, goal 0.801 m ahead, 1.5 m/s^2 both ways.
+        // Stops 1.92 m on at 26.619 after 1.6 s; 1.119 m back takes 2 * sqrt(1.119 / 1.5) s.
+        {24.699, 25.5, 2.4, 1.5, 1.5, 2.5, 1.6 + 2 * std::sqrt(1.119 / 1.5), 26.619},
+        // The return reaches vmax: stops at 50 after 10 s, then 40 m back at <= 2 m/s.
+        {0.0, 10.0, 10.0, 1.0, 1.0, 2.0, 10.0 + 2.0 + 18.0 + 2.0, 50.0},
+    };
+    for (const auto& c : cases) {
+        const std::string where = describe(c.p0, c.pe, c.v0, c.acc, c.dec, c.vmax, 0.0);
+        TwoPointInterpolation tpi;
+        tpi.init(c.p0, c.pe, c.acc, c.vmax, 0.0, c.v0, 0.0, c.dec);
+        const double total = tpi.calcTrajectory();
+        check(almostEqual(total, c.total_time, 1e-6), "wrong total time " + std::to_string(total) + ": " + where);
+        assertFinalState(tpi, total, c.pe, 0.0);
+        assertBoundaryContinuity(tpi);
+        const auto stop = tpi.getPoint(tpi.getDt()[0]);
+        check(almostEqual(stop[0], c.p_far, 1e-6) && almostEqual(stop[1], 0.0, 1e-9),
+              "does not stand still at the far point: " + where);
+        double far = 0.0;
+        for (int i = 0; i <= 20000; ++i) {
+            const auto s = tpi.getPoint(total * i / 20000.0);
+            far = std::max(far, std::fabs(s[0] - c.p0));
+            check(std::fabs(s[1]) <= std::max(c.vmax, std::fabs(c.v0)) + 1e-9, "speed above its limit: " + where);
+        }
+        check(almostEqual(far, std::fabs(c.p_far - c.p0), 1e-6), "goes beyond the far point: " + where);
+    }
+    std::cout << "✅ " << cases.size() << " overshooting trajectories stop and come back" << std::endl;
+}
+
 void testAngleTurningAwayFromItsTarget() {
     std::cout << "Testing an angle starting to turn away from its target..." << std::endl;
     // 350 deg to 10 deg is +20 deg the short way; start turning at -1 rad/s.
@@ -653,6 +697,7 @@ int main() {
         testConcreteCases();
         testAccelerationOnlyArrival();
         testInfeasibleRequestsThrow();
+        testOvershootStopsAndComesBack();
         testEveryReturnedTrajectoryIsValid();
         testAngleTurningAwayFromItsTarget();
         
