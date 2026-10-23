@@ -151,6 +151,9 @@ public:
                 _caseNum = -1;  // Special case for no movement
                 _trajectoryCalced = true;
                 return 0.0;
+            } else if (_ve == 0) {
+                // Moving through the target: stop beyond it, then come back.
+                return calcStopThenReturn();
             } else {
                 // TODO(two_points_interpolation_py#9): reverse profile -- move away and come
                 // back to change speed without changing position.
@@ -211,6 +214,11 @@ public:
             // for overshoot / back-up trajectories; both checks below would then have a
             // trajectory to return.
             if (dt01 <= 0) {
+                // Too fast to slow down to ve before pe: overshoot, stop, and come back.
+                const double decel_distance = (_v0 * _v0 - _ve * _ve) / (2 * _amax_decel);
+                if (sign * _v0 > 0 && decel_distance > std::fabs(dp) && sign * _ve <= 0) {
+                    return calcStopThenReturn();
+                }
                 throwCannotStopInTime(dp, dec, sign);
             }
             // The deceleration phase must slow v1 down to ve; if ve is faster than v1 in
@@ -297,8 +305,8 @@ public:
             }
             std::cout << std::endl;
             std::cout << "a ";
-            for (double acc : _a) {
-                std::cout << acc << " ";
+            for (double a_i : _a) {
+                std::cout << a_i << " ";
             }
             std::cout << std::endl;
             std::cout << "v ";
@@ -387,6 +395,38 @@ public:
     const std::vector<double>& getDt() const { return _dt; }
 
 private:
+    // Case 2: brake at the full deceleration until the body stands still, then plan an
+    // ordinary trajectory from there back to (pe, ve). Used when v0 carries the body to
+    // or past pe before it can slow down to ve, which no accelerate-then-decelerate
+    // profile can reach. The first phase is the braking one; the return phases follow.
+    double calcStopThenReturn() {
+        const double t_stop = std::fabs(_v0) / _amax_decel;
+        const double a_stop = _v0 > 0 ? -_amax_decel : _amax_decel;
+        const double p_stop = pInteg(_p0, _v0, a_stop, t_stop);
+
+        TwoPointInterpolation back(_verbose);
+        back.init(p_stop, _pe, _amax_accel, _vmax, 0.0, 0.0, _ve, _amax_decel);
+        back.calcTrajectory();
+
+        _dt.assign(1, t_stop);
+        _a.assign(1, a_stop);
+        _v.assign(1, _v0);
+        _p.assign(1, _p0);
+        for (size_t i = 0; i < back._dt.size(); ++i) {
+            _dt.push_back(back._dt[i]);
+            _a.push_back(back._a[i]);
+            _v.push_back(back._v[i]);
+            _p.push_back(back._p[i]);
+        }
+        _caseNum = 2;
+        _trajectoryCalced = true;
+
+        if (_verbose) {
+            std::cout << "case 2: stop at " << p_stop << " after " << t_stop << " s, then return" << std::endl;
+        }
+        return sum(_dt, _dt.size());
+    }
+
     // The body already moves toward the target faster than it can slow down to ve
     // within |dp|.
     [[noreturn]] void throwCannotStopInTime(const double dp, const double dec, const double sign) const {
